@@ -1,0 +1,68 @@
+
+MODEL_CONFIG:
+  IMG_SIZE: 512
+
+TRAINING_CONFIG:
+
+  EPOCH: 800
+  BATCH_SIZE: 16
+
+  # lr and lambda
+  G_LR : 10e-7
+  D_LR : 10e-7
+  LAMBDA_G_FAKE  : 1
+  LAMBDA_G_RECON : 1
+  LAMBDA_D_FAKE  : 1
+  LAMBDA_D_REAL  : 1
+  LAMBDA_GP : 20000
+
+  # Optimizer
+  OPTIM : ADAM
+  BETA1: 0.5
+  BETA2: 0.999
+  D_CRITIC : 1
+  G_CRITIC : 3
+
+  # Settings
+  NUM_WORKER : 4
+  MODE : 'train'
+  CPU_SEED : 123
+  GPU_SEED : 456
+  USE_TENSORBOARD : 'False' # 'True' or 'False'
+
+  # model type
+  MODEL_TYPE : 'res'
+
+  # noise parameter
+  DIST : 'uniform' # of 'gaussian'
+  A : -5
+  B : 5
+  MEAN : 0
+  STD : 0.01
+  #spectral norm
+  G_SPEC : 'false'
+  D_SPEC : 'true'
+
+  # Directory
+  IMG_DIR : 'data'
+  TRAIN_DIR : 'tutorial_gan'
+  LOG_DIR : 'logs'
+  SAMPLE_DIR : 'samples'
+  RESULT_DIR : 'results'
+  MODEL_DIR : 'models'
+
+  # GPU
+  GPU: 0
+
+  # Step Size
+
+  SAMPLE_STEP : 1 # epoch based
+  LOG_STEP : 100 # iteration based
+  SAVE_STEP : 10 # epoch based
+  SAVE_START : 300
+  LR_DECAY_STEP : 20
+
+TEST_CONFIG:
+  TEST_EPOCH : 100
+
+

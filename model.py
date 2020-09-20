@@ -3,6 +3,7 @@ import torch
 
 from block import ConvDownBlock
 
+
 class Discriminator(nn.Module):
     """Discriminator network with PatchGAN.
     W = (W - F + 2P) /S + 1"""
