@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import math
-from block import ConvDownBlock
+from block import ConvBlock
 
 
 class Discriminator(nn.Module):
@@ -11,10 +11,10 @@ class Discriminator(nn.Module):
     def __init__(self, spec_norm=True):
         super(Discriminator, self).__init__()
         self.main = list()
-        self.main.append(ConvDownBlock(3, 16, spec_norm, stride=2)) # 256 -> 128
-        self.main.append(ConvDownBlock(16, 32, spec_norm, stride=2)) # 128 -> 64
-        self.main.append(ConvDownBlock(32, 64, spec_norm, stride=2)) # 64 -> 32
-        self.main.append(ConvDownBlock(64, 128, spec_norm, stride=2)) # 32 -> 16
+        self.main.append(ConvBlock(3, 16, spec_norm, stride=2)) # 256 -> 128
+        self.main.append(ConvBlock(16, 32, spec_norm, stride=2)) # 128 -> 64
+        self.main.append(ConvBlock(32, 64, spec_norm, stride=2)) # 64 -> 32
+        self.main.append(ConvBlock(64, 128, spec_norm, stride=2)) # 32 -> 16
         self.main.append(nn.Conv2d(128, 1, kernel_size=3, stride=1, padding=1))
         self.main = nn.Sequential(*self.main)
 
@@ -50,16 +50,16 @@ class Encoder(nn.Module):
     def __init__(self, in_channels=3, spec_norm=False, LR=0.2):
         super(Encoder, self).__init__()
 
-        self.layer1 = ConvDownBlock(in_channels, 16, spec_norm, LR=LR)
-        self.layer2 = ConvDownBlock(16, 16, spec_norm, LR=LR)
-        self.layer3 = ConvDownBlock(16, 32, spec_norm, stride=2, LR=LR)
-        self.layer4 = ConvDownBlock(32, 32, spec_norm, LR=LR)
-        self.layer5 = ConvDownBlock(32, 64, spec_norm, stride=2, LR=LR)
-        self.layer6 = ConvDownBlock(64, 64, spec_norm, LR=LR)
-        self.layer7 = ConvDownBlock(64, 128, spec_norm, stride=2, LR=LR)
-        self.layer8 = ConvDownBlock(128, 128, spec_norm, LR=LR)
-        self.layer9 = ConvDownBlock(128, 256, spec_norm, stride=2, LR=LR)
-        self.layer10 = ConvDownBlock(256, 256, spec_norm, LR=LR)
+        self.layer1 = ConvBlock(in_channels, 16, spec_norm, LR=LR) # 256
+        self.layer2 = ConvBlock(16, 16, spec_norm, LR=LR) # 256
+        self.layer3 = ConvBlock(16, 32, spec_norm, stride=2, LR=LR) # 128
+        self.layer4 = ConvBlock(32, 32, spec_norm, LR=LR) # 128
+        self.layer5 = ConvBlock(32, 64, spec_norm, stride=2, LR=LR) # 64
+        self.layer6 = ConvBlock(64, 64, spec_norm, LR=LR) # 64
+        self.layer7 = ConvBlock(64, 128, spec_norm, stride=2, LR=LR) # 32
+        self.layer8 = ConvBlock(128, 128, spec_norm, LR=LR) # 32
+        self.layer9 = ConvBlock(128, 256, spec_norm, stride=2, LR=LR) # 16
+        self.layer10 = ConvBlock(256, 256, spec_norm, LR=LR) # 16
         self.down_sampling = nn.AdaptiveAvgPool2d((16, 16))
 
     def forward(self, x):
@@ -109,16 +109,16 @@ class Encoder(nn.Module):
                             feature_map10,
                             ], dim=1)
 
-        feature_list = [down_feature_map1,
-         down_feature_map2,
-         down_feature_map3,
-         down_feature_map4,
-         down_feature_map5,
-         down_feature_map6,
-         down_feature_map7,
-         down_feature_map8,
+        feature_list = [feature_map1,
+         feature_map2,
+         feature_map3,
+         feature_map4,
+         feature_map5,
+         feature_map6,
+         feature_map7,
+         feature_map8,
          feature_map9,
-         feature_map10,
+         #feature_map10,
          ]
         #print('output.size : ', output.size()) # output.size :  torch.Size([2, 992, 16, 16])
         b, ch, h, w = output.size()
@@ -131,11 +131,35 @@ class Decoder(nn.Module):
     """Discriminator network with PatchGAN.
     W = (W - F + 2P) /S + 1"""
 
-    def __init__(self, in_channels=3, spec_norm=False, LR=0.2):
+    def __init__(self, spec_norm=False, LR=0.2):
         super(Decoder, self).__init__()
+        self.layer10 = ConvBlock(992 * 2, 256, spec_norm, LR=LR) # 16->16
+        self.layer9 = ConvBlock(512, 256, spec_norm, LR=LR) # 16->16
+        self.layer8 = ConvBlock(256 + 128, 128, spec_norm, LR=LR, up=True) # 16->32
+        self.layer7 = ConvBlock(256, 128, spec_norm, LR=LR) # 32->32
+        self.layer6 = ConvBlock(128 + 64, 64, spec_norm, LR=LR, up=True) # 32-> 64
+        self.layer5 = ConvBlock(64 + 64, 64, spec_norm, LR=LR) # 64 -> 64
+        self.layer4 = ConvBlock(64 + 32, 32, spec_norm, LR=LR, up=True) # 64 -> 128
+        self.layer3 = ConvBlock(32 + 32, 32, spec_norm, LR=LR) # 128 -> 128
+        self.layer2 = ConvBlock(32 + 16, 16, spec_norm, LR=LR, up=True) # 128 -> 256
+        self.layer1 = ConvBlock(16 + 16, 16, spec_norm, LR=LR) # 256 -> 256
+        self.last_conv = nn.Conv2d(16, 3, kernel_size=3, stride=1, padding=1)
+        self.tanh = nn.Tanh()
 
-    def forward(self, x):
-        return x
+    def forward(self, x, feature_list):
+
+        feature_map10 = self.layer10(x)
+        feature_map9 = self.layer9(torch.cat([feature_map10, feature_list[-1]], dim=1))
+        feature_map8 = self.layer8(torch.cat([feature_map9, feature_list[-2]], dim=1))
+        feature_map7 = self.layer7(torch.cat([feature_map8, feature_list[-3]], dim=1))
+        feature_map6 = self.layer6(torch.cat([feature_map7, feature_list[-4]], dim=1))
+        feature_map5 = self.layer5(torch.cat([feature_map6, feature_list[-5]], dim=1))
+        feature_map4 = self.layer4(torch.cat([feature_map5, feature_list[-6]], dim=1))
+        feature_map3 = self.layer3(torch.cat([feature_map4, feature_list[-7]], dim=1))
+        feature_map2 = self.layer2(torch.cat([feature_map3, feature_list[-8]], dim=1))
+        feature_map1 = self.layer1(torch.cat([feature_map2, feature_list[-9]], dim=1))
+        feature_map0 = self.last_conv(feature_map1)
+        return self.tanh(feature_map0)
 
 
 class SCFT_Moudle(nn.Module):
