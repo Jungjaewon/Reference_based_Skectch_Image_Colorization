@@ -61,6 +61,7 @@ if __name__ == '__main__':
     print(uniform)
     """
 
+    """
     model_r = Encoder()
     model_s = Encoder(in_channels=1)
     decoder = Decoder()
@@ -70,14 +71,30 @@ if __name__ == '__main__':
     v_r, _ = model_r(tensor1)
     v_s, feature_list = model_s(tensor2)
 
-
-
     scft_module = SCFT_Moudle()
     res_model = ResBlockNet(992, 992)
     v_c = scft_module(v_s, v_r)
     rv_c = res_model(v_c)
 
     concat = torch.cat([rv_c, v_c], dim=1)
+
+    image = decoder(concat, feature_list)
+
+    print(image.size())
+    """
+
+    #result = Image.open(r"C:\Users\woodc\Desktop\deep_paint_split\train\1038_color.png").convert("RGB")
+    """
+    result = np.asarray(result)
+    elastic_result = elastic_transform(result, 1000, 8, random_state=None)
+    elastic_result = Image.fromarray(elastic_result)
+    elastic_result.save('./elastic_result.jpg')
+    """
+
+    tensor1 = torch.randn((2, 3, 256, 256))
+    tensor2 = torch.randn((2, 1, 256, 256))
+
+    print(torch.cat([tensor1, tensor2], dim=1).size())
 
 
 

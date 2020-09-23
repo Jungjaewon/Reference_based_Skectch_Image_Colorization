@@ -43,6 +43,8 @@ def elastic_transform(image, alpha, sigma, random_state=None):
        Proc. of the International Conference on Document Analysis and
        Recognition, 2003.
     """
+
+    print('image : ', id(image))
     if random_state is None:
         random_state = np.random.RandomState(None)
 
@@ -56,7 +58,7 @@ def elastic_transform(image, alpha, sigma, random_state=None):
 
     indices = np.reshape(y + dy, (-1, 1)), np.reshape(x + dx, (-1, 1)), np.reshape(z, (-1, 1))
     distored_image = map_coordinates(image, indices, order=1, mode='nearest')  # wrap,reflect, nearest
-
+    print('distored_image : ', id(distored_image))
     return distored_image.reshape(image.shape)
 
 """

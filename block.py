@@ -29,7 +29,7 @@ class ConvBlock(nn.Module):
             )
 
 
-    def forward(self, x1, x2):
+    def forward(self, x1, x2=None):
         if self.up_smaple is not None:
             x1 = self.up_smaple(x1)
             # input is CHW

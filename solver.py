@@ -11,11 +11,6 @@ from functools import reduce
 from model import Generator
 from model import Discriminator
 
-from res_model import Generator as rGenerator
-from res_model import Discriminator as rDiscriminator
-
-from unet import UNet
-
 from torchvision.models import vgg19
 from torchvision.utils import save_image
 
@@ -42,6 +37,8 @@ class Solver(object):
         self.d_lr          = float(config['TRAINING_CONFIG']['D_LR'])
         self.lambda_g_fake = config['TRAINING_CONFIG']['LAMBDA_G_FAKE']
         self.lambda_g_recon = config['TRAINING_CONFIG']['LAMBDA_G_RECON']
+        self.lambda_g_style = config['TRAINING_CONFIG']['LAMBDA_G_SYTLE']
+        self.lambda_g_percep = config['TRAINING_CONFIG']['LAMBDA_G_PERCEP']
         self.lambda_d_fake = config['TRAINING_CONFIG']['LAMBDA_D_FAKE']
         self.lambda_d_real = config['TRAINING_CONFIG']['LAMBDA_D_REAL']
         self.lambda_gp     = config['TRAINING_CONFIG']['LAMBDA_GP']
@@ -52,6 +49,8 @@ class Solver(object):
         self.optim = config['TRAINING_CONFIG']['OPTIM']
         self.beta1 = config['TRAINING_CONFIG']['BETA1']
         self.beta2 = config['TRAINING_CONFIG']['BETA2']
+        self.adversarial_loss = torch.nn.MSELoss()
+        self.l1_loss = torch.nn.L1Loss()
 
         self.cpu_seed = config['TRAINING_CONFIG']['CPU_SEED']
         self.gpu_seed = config['TRAINING_CONFIG']['GPU_SEED']
@@ -91,17 +90,8 @@ class Solver(object):
             self.build_tensorboard()
 
     def build_model(self):
-
-        if self.model_type == 'unet':
-            self.G = UNet(n_channels=3, n_classes=3)
-            self.D = rDiscriminator(spec_norm=self.d_spec).to(self.gpu)
-        elif self.model_type == 'res':
-            self.G = rGenerator(spec_norm=self.g_spec).to(self.gpu)
-            self.D = rDiscriminator(spec_norm=self.d_spec).to(self.gpu)
-        else:
-            self.G = Generator(spec_norm=self.g_spec).to(self.gpu)
-            self.D = Discriminator(spec_norm=self.d_spec).to(self.gpu)
-
+        self.G = Generator(spec_norm=self.g_spec).to(self.gpu)
+        self.D = Discriminator(spec_norm=self.d_spec, LR=0.2).to(self.gpu)
         self.vgg = vgg19(pretrained=True)
         for layer in self.target_layer:
             self.vgg.features[int(layer[-1])].register_forward_hook(get_activation(layer))
@@ -113,7 +103,6 @@ class Solver(object):
         self.vgg.features[26].register_forward_hook(get_activation('relu_26'))
         self.vgg.features[35].register_forward_hook(get_activation('relu_35'))
         """
-
         self.g_optimizer = torch.optim.Adam(self.G.parameters(), self.g_lr, (self.beta1, self.beta2))
         self.d_optimizer = torch.optim.Adam(self.D.parameters(), self.d_lr, (self.beta1, self.beta2))
 
@@ -170,6 +159,19 @@ class Solver(object):
         dydx_l2norm = torch.sqrt(torch.sum(dydx ** 2, dim=1))
         return torch.mean((dydx_l2norm - 1) ** 2)
 
+    def gram_matrix(self, input):
+        a, b, c, d = input.size()  # a=batch size(=1)
+        # b=number of feature maps
+        # (c,d)=dimensions of a f. map (N=c*d)
+
+        features = input.view(a * b, c * d)  # resise F_XL into \hat F_XL
+
+        G = torch.mm(features, features.t())  # compute the gram product
+
+        # we 'normalize' the values of the gram matrix
+        # by dividing by the number of element in each feature maps.
+        return G.div(a * b * c * d)
+
     def train(self):
 
         # Set data loader.
@@ -178,10 +180,11 @@ class Solver(object):
         print('iterations : ', iterations)
         # Fetch fixed inputs for debugging.
         data_iter = iter(data_loader)
-        _, fixed_color, fixed_sketch = next(data_iter)
+        _, fixed_elastic_reference, fixed_reference, fixed_sketch = next(data_iter)
 
         fixed_sketch = fixed_sketch.to(self.gpu)
-        fixed_color = fixed_color.to(self.gpu)
+        fixed_reference = fixed_reference.to(self.gpu)
+        fixed_elastic_reference = fixed_elastic_reference.to(self.gpu)
 
         # Learning rate cache for decaying.
         g_lr = self.g_lr
@@ -193,17 +196,35 @@ class Solver(object):
 
             for i in range(iterations):
                 try:
-                    _, color, sketch = next(data_iter)
+                    _, elastic_reference, reference, sketch = next(data_iter)
                 except:
                     data_iter = iter(data_loader)
-                    _, color, sketch = next(data_iter)
+                    _, elastic_reference, reference, sketch = next(data_iter)
 
-                color = color.to(self.gpu)
+                elastic_reference = elastic_reference.to(self.gpu)
+                reference = reference.to(self.gpu)
                 sketch = sketch.to(self.gpu)
 
                 loss_dict = dict()
-                #print(target_images[:, 0].size()) # torch.Size([batch_size, ch, H, W])
                 if (i + 1) % self.d_critic == 0:
+
+                    fake_images = self.G(elastic_reference, sketch)
+                    real_score = self.D(torch.cat([reference, sketch], dim=1))
+                    fake_score = self.D(torch.cat([fake_images.detach(), sketch], dim=1))
+                    d_loss_real = self.adversarial_loss(real_score, torch.ones_like(real_score))
+                    d_loss_fake = self.adversarial_loss(fake_score, torch.zeros_like(fake_score))
+
+                    # Backward and optimize.
+                    d_loss = self.lambda_d_real * d_loss_real + self.lambda_d_fake * d_loss_fake
+                    self.reset_grad()
+                    d_loss.backward()
+                    self.d_optimizer.step()
+
+                    # Logging.
+                    loss_dict['D/loss_real'] = d_loss_real.item()
+                    loss_dict['D/loss_fake'] = d_loss_fake.item()
+
+                    """
                     out_score = self.D(color)
 
                     d_loss_real = -torch.mean(out_score)
@@ -217,27 +238,39 @@ class Solver(object):
                     x_hat = (alpha * color.data + (1 - alpha) * x_fake.data).requires_grad_(True)
                     out_src = self.D(x_hat)
                     d_loss_gp = self.gradient_penalty(out_src, x_hat)
-
-                    # Backward and optimize.
-                    d_loss = self.lambda_d_real * d_loss_real + self.lambda_d_fake * d_loss_fake + self.lambda_gp * d_loss_gp
-                    self.reset_grad()
-                    d_loss.backward()
-                    self.d_optimizer.step()
-
-                    # Logging.
-                    loss_dict['D/loss_real'] = d_loss_real.item()
-                    loss_dict['D/loss_fake'] = d_loss_fake.item()
-                    loss_dict['D/loss_gp'] = d_loss_gp.item()
-
+                    """
                 if (i + 1) % self.g_critic == 0:
-                    # Original-to-target domain.
-                    x_fake = self.G(sketch)
-                    out_src = self.D(x_fake)
-                    g_loss_fake = - torch.mean(out_src)
-                    g_loss_recon = self.mse_loss(x_fake, color)
+                    fake_images = self.G(elastic_reference, sketch)
+                    fake_score = self.D(torch.cat([fake_images, sketch], dim=1))
+                    g_loss_fake = self.adversarial_loss(fake_score, torch.ones_like(fake_score))
 
-                    # Backward and optimize.
-                    g_loss = self.lambda_g_fake * g_loss_fake + self.lambda_g_recon * g_loss_recon
+                    g_loss_recon = self.l1_loss(fake_images, reference)
+
+                    fake_activation = dict()
+                    real_activation = dict()
+
+                    self.vgg(reference)
+                    for layer in self.target_layer:
+                        fake_activation[layer] = vgg_activation[layer]
+                    vgg_activation.clear()
+
+                    self.vgg(fake_images)
+                    for layer in self.target_layer:
+                        real_activation[layer] = vgg_activation[layer]
+                    vgg_activation.clear()
+
+                    g_loss_style = 0
+                    g_loss_percep = 0
+
+                    for layer in self.target_layer:
+                        g_loss_percep += self.l1_loss(fake_activation[layer], real_activation[layer])
+                        g_loss_style += self.l1_loss(self.gram_matrix(fake_activation[layer]), self.gram_matrix(real_activation[layer]))
+
+                    g_loss = self.lambda_g_fake * g_loss_fake + \
+                    self.lambda_g_recon * g_loss_recon + \
+                    self.lambda_g_percep * g_loss_percep + \
+                    self.lambda_g_style * g_loss_style
+
                     self.reset_grad()
                     g_loss.backward()
                     self.g_optimizer.step()
@@ -245,6 +278,15 @@ class Solver(object):
                     # Logging.
                     loss_dict['G/loss_fake'] = g_loss_fake.item()
                     loss_dict['G/loss_recon'] = g_loss_recon.item()
+                    loss_dict['G/loss_style'] = g_loss_style.item()
+                    loss_dict['G/loss_percep'] = g_loss_percep.item()
+
+                    """
+                    # Original-to-target domain.
+                    x_fake = self.G(sketch)
+                    out_src = self.D(x_fake)
+                    g_loss_fake = - torch.mean(out_src)
+                    """
 
                 if (i + 1) % self.log_step == 0:
                     et = time.time() - start_time
@@ -258,7 +300,7 @@ class Solver(object):
                 with torch.no_grad():
                     image_report = list()
                     image_report.append(fixed_sketch)
-                    image_report.append(fixed_color)
+                    image_report.append(fixed_reference)
                     image_report.append(self.G(fixed_sketch))
                     x_concat = torch.cat(image_report, dim=3)
                     sample_path = os.path.join(self.sample_dir, '{}-images.jpg'.format(e + 1))

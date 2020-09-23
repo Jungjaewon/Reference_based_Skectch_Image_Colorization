@@ -8,10 +8,13 @@ TRAINING_CONFIG:
   BATCH_SIZE: 16
 
   # lr and lambda
-  G_LR : 10e-7
-  D_LR : 10e-7
+  G_LR : 10e-4
+  D_LR : 20e-4
+  LAMBDA_TR  : 12
   LAMBDA_G_FAKE  : 1
-  LAMBDA_G_RECON : 1
+  LAMBDA_G_RECON : 30
+  LAMBDA_G_SYTLE : 50
+  LAMBDA_G_PERCEP : 0.01
   LAMBDA_D_FAKE  : 1
   LAMBDA_D_REAL  : 1
   LAMBDA_GP : 20000
@@ -21,7 +24,7 @@ TRAINING_CONFIG:
   BETA1: 0.5
   BETA2: 0.999
   D_CRITIC : 1
-  G_CRITIC : 3
+  G_CRITIC : 1
 
   # Settings
   NUM_WORKER : 4

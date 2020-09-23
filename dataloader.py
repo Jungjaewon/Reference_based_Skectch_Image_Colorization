@@ -1,13 +1,12 @@
 import os
 import os.path as osp
 import glob
-import torch
 import numpy as np
 
-from utils import elastic_transform
 from torch.utils import data
 from torchvision import transforms as T
 from PIL import Image
+from utils import elastic_transform
 
 
 class DataSet(data.Dataset):
@@ -32,18 +31,21 @@ class DataSet(data.Dataset):
 
     def __getitem__(self, index):
         fid = self.data_list[index]
-        color = Image.open(osp.join(self.img_dir, '{}_color.png'.format(fid))).convert('RGB')
-        edge = Image.open(osp.join(self.img_dir, '{}_sketch.png'.format(fid))).convert('L')
+        reference = Image.open(osp.join(self.img_dir, '{}_color.png'.format(fid))).convert('RGB')
+        sketch = Image.open(osp.join(self.img_dir, '{}_sketch.png'.format(fid))).convert('L')
+
+        elastic_reference = elastic_transform(np.array(reference), 1000, 8, random_state=None)
+        elastic_reference = Image.fromarray(elastic_reference)
 
         if self.dist == 'uniform':
-            noise = np.random.uniform(self.a, self.b, np.shape(color))
+            noise = np.random.uniform(self.a, self.b, np.shape(reference))
         else:
-            noise = np.random.uniform(self.mean, self.std, np.shape(color))
+            noise = np.random.uniform(self.mean, self.std, np.shape(reference))
 
-        color = np.array(color) + noise
-        color = Image.fromarray(color.astype('uint8'))
+        reference = np.array(reference) + noise
+        reference = Image.fromarray(reference.astype('uint8'))
 
-        return fid, self.img_transform(color), self.img_transform(edge)
+        return fid, self.img_transform(elastic_reference), self.img_transform(reference), self.img_transform(sketch)
 
     def __len__(self):
         """Return the number of images."""
