@@ -5,6 +5,8 @@ import operator
 import datetime
 import torch
 import torch.nn as nn
+import glob
+import os.path as osp
 
 from torchvision import models
 from functools import reduce
@@ -172,6 +174,24 @@ class Solver(object):
         # by dividing by the number of element in each feature maps.
         return G.div(a * b * c * d)
 
+    def restore_model(self):
+
+        ckpt_list = glob.glob(osp.join(self.model_dir, '*-G.ckpt'))
+
+        if len(ckpt_list) == 0:
+            return 0
+
+        ckpt_list = [int(x[0]) for x in ckpt_list]
+        ckpt_list.sort()
+        epoch = ckpt_list[-1]
+        G_path = os.path.join(self.model_dir, '{}-G.ckpt'.format(epoch))
+        D_path = os.path.join(self.model_dir, '{}-D.ckpt'.format(epoch))
+        self.G.load_state_dict(torch.load(G_path, map_location=lambda storage, loc: storage))
+        self.D.load_state_dict(torch.load(D_path, map_location=lambda storage, loc: storage))
+        self.G.to(self.gpu)
+        self.D.to(self.gpu)
+        return epoch
+
     def train(self):
 
         # Set data loader.
@@ -190,9 +210,10 @@ class Solver(object):
         g_lr = self.g_lr
         d_lr = self.d_lr
 
+        start_epoch = self.restore_model()
         start_time = time.time()
         print('Start training...')
-        for e in range(self.epoch):
+        for e in range(start_epoch, self.epoch):
 
             for i in range(iterations):
                 try:
