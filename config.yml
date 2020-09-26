@@ -10,7 +10,7 @@ TRAINING_CONFIG:
   # lr and lambda
   G_LR : 10e-4
   D_LR : 20e-4
-  LAMBDA_TR  : 12
+  LAMBDA_TR  : 12.0
   LAMBDA_G_FAKE  : 1
   LAMBDA_G_RECON : 30
   LAMBDA_G_SYTLE : 50
@@ -18,6 +18,13 @@ TRAINING_CONFIG:
   LAMBDA_D_FAKE  : 1
   LAMBDA_D_REAL  : 1
   LAMBDA_GP : 20000
+
+  # Data augmentation
+  AUGMENT : 'elastic' # or 'tps
+
+  #Triplet loss
+  TRIPLE_LOSS : 'True'
+  GAN_LOSS : 'lsgan'
 
   # Optimizer
   OPTIM : ADAM

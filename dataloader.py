@@ -5,6 +5,7 @@ import numpy as np
 
 from torch.utils import data
 from torchvision import transforms as T
+from tps_transformation import tps_transform
 from PIL import Image
 from utils import elastic_transform
 
@@ -21,6 +22,8 @@ class DataSet(data.Dataset):
         self.data_list = list(set(self.data_list))
         #random.seed(config['TRAINING_CONFIG']['CPU_SEED'])
 
+        self.augment = config['TRAINING_CONFIG']['AUGMENT']
+
         self.dist = config['TRAINING_CONFIG']['DIST']
         if self.dist == 'uniform':
             self.a = config['TRAINING_CONFIG']['A']
@@ -34,18 +37,24 @@ class DataSet(data.Dataset):
         reference = Image.open(osp.join(self.img_dir, '{}_color.png'.format(fid))).convert('RGB')
         sketch = Image.open(osp.join(self.img_dir, '{}_sketch.png'.format(fid))).convert('L')
 
-        elastic_reference = elastic_transform(np.array(reference), 1000, 8, random_state=None)
-        elastic_reference = Image.fromarray(elastic_reference)
-
         if self.dist == 'uniform':
             noise = np.random.uniform(self.a, self.b, np.shape(reference))
         else:
-            noise = np.random.uniform(self.mean, self.std, np.shape(reference))
+            noise = np.random.normal(self.mean, self.std, np.shape(reference))
 
         reference = np.array(reference) + noise
         reference = Image.fromarray(reference.astype('uint8'))
 
-        return fid, self.img_transform(elastic_reference), self.img_transform(reference), self.img_transform(sketch)
+        if self.augment == 'elastic':
+            augmented_reference = elastic_transform(np.array(reference), 1000, 8, random_state=None)
+            augmented_reference = Image.fromarray(augmented_reference)
+        elif self.augment == 'tps':
+            augmented_reference = tps_transform(np.array(reference))
+            augmented_reference = Image.fromarray(augmented_reference)
+        else:
+            augmented_reference = reference
+
+        return fid, self.img_transform(augmented_reference), self.img_transform(reference), self.img_transform(sketch)
 
     def __len__(self):
         """Return the number of images."""

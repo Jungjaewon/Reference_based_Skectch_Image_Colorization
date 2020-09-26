@@ -43,10 +43,18 @@ class Solver(object):
         self.lambda_g_percep = config['TRAINING_CONFIG']['LAMBDA_G_PERCEP']
         self.lambda_d_fake = config['TRAINING_CONFIG']['LAMBDA_D_FAKE']
         self.lambda_d_real = config['TRAINING_CONFIG']['LAMBDA_D_REAL']
-        self.lambda_gp     = config['TRAINING_CONFIG']['LAMBDA_GP']
+        self.lambda_d_gp     = config['TRAINING_CONFIG']['LAMBDA_GP']
         self.d_critic      = config['TRAINING_CONFIG']['D_CRITIC']
         self.g_critic      = config['TRAINING_CONFIG']['G_CRITIC']
-        self.mse_loss = torch.nn.MSELoss()
+        self.mse_loss = nn.MSELoss()
+
+        self.triplet = config['TRAINING_CONFIG']['TRIPLE_LOSS'] == 'true'
+        self.gan_loss = config['TRAINING_CONFIG']['GAN_LOSS']
+        assert self.gan_loss in ['lsgan', 'wgan']
+
+        if self.triplet:
+            self.triplet_loss = nn.TripletMarginLoss(margin=config['TRAINING_CONFIG']['LAMBDA_TR'])
+            # triplet_loss(anchor, positive, negative)
 
         self.optim = config['TRAINING_CONFIG']['OPTIM']
         self.beta1 = config['TRAINING_CONFIG']['BETA1']
@@ -230,13 +238,29 @@ class Solver(object):
                 if (i + 1) % self.d_critic == 0:
 
                     fake_images = self.G(elastic_reference, sketch)
-                    real_score = self.D(torch.cat([reference, sketch], dim=1))
-                    fake_score = self.D(torch.cat([fake_images.detach(), sketch], dim=1))
-                    d_loss_real = self.adversarial_loss(real_score, torch.ones_like(real_score))
-                    d_loss_fake = self.adversarial_loss(fake_score, torch.zeros_like(fake_score))
+                    d_loss = None
+
+                    if self.gan_loss == 'lsgan':
+                        real_score = self.D(torch.cat([reference, sketch], dim=1))
+                        fake_score = self.D(torch.cat([fake_images.detach(), sketch], dim=1))
+                        d_loss_real = self.adversarial_loss(real_score, torch.ones_like(real_score))
+                        d_loss_fake = self.adversarial_loss(fake_score, torch.zeros_like(fake_score))
+                        d_loss = self.lambda_d_real * d_loss_real + self.lambda_d_fake * d_loss_fake
+                    elif self.gan_loss == 'wgan':
+                        real_score = self.D(torch.cat([reference, sketch], dim=1))
+                        fake_score = self.D(torch.cat([fake_images.detach(), sketch], dim=1))
+                        d_loss_real = -torch.mean(real_score)
+                        d_loss_fake = torch.mean(fake_score)
+                        d_loss = self.lambda_d_real * d_loss_real + self.lambda_d_fake * d_loss_fake
+                        alpha = torch.rand(reference.size(0), 1, 1, 1).to(self.gpu)
+                        x_hat = (alpha * reference.data + (1 - alpha) * fake_images.data).requires_grad_(True)
+                        out_src = self.D(x_hat)
+                        d_loss_gp = self.gradient_penalty(out_src, x_hat)
+                        d_loss = self.lambda_d_real * d_loss_real + self.lambda_d_fake * d_loss_fake + self.lambda_d_gp * d_loss_gp
+                    else:
+                        pass
 
                     # Backward and optimize.
-                    d_loss = self.lambda_d_real * d_loss_real + self.lambda_d_fake * d_loss_fake
                     self.reset_grad()
                     d_loss.backward()
                     self.d_optimizer.step()
@@ -245,26 +269,15 @@ class Solver(object):
                     loss_dict['D/loss_real'] = d_loss_real.item()
                     loss_dict['D/loss_fake'] = d_loss_fake.item()
 
-                    """
-                    out_score = self.D(color)
-
-                    d_loss_real = -torch.mean(out_score)
-
-                    x_fake = self.G(sketch)
-                    out_score = torch.mean(x_fake.detach())
-                    d_loss_fake = torch.mean(out_score)
-
-                    # Compute loss for gradient penalty.
-                    alpha = torch.rand(color.size(0), 1, 1, 1).to(self.gpu)
-                    x_hat = (alpha * color.data + (1 - alpha) * x_fake.data).requires_grad_(True)
-                    out_src = self.D(x_hat)
-                    d_loss_gp = self.gradient_penalty(out_src, x_hat)
-                    """
                 if (i + 1) % self.g_critic == 0:
                     fake_images = self.G(elastic_reference, sketch)
                     fake_score = self.D(torch.cat([fake_images, sketch], dim=1))
-                    g_loss_fake = self.adversarial_loss(fake_score, torch.ones_like(fake_score))
-
+                    if self.gan_loss == 'lsgan':
+                        g_loss_fake = self.adversarial_loss(fake_score, torch.ones_like(fake_score))
+                    elif self.gan_loss == 'wgan':
+                        g_loss_fake = - torch.mean(fake_score)
+                    else:
+                        pass
                     g_loss_recon = self.l1_loss(fake_images, reference)
 
                     fake_activation = dict()
@@ -301,13 +314,6 @@ class Solver(object):
                     loss_dict['G/loss_recon'] = g_loss_recon.item()
                     loss_dict['G/loss_style'] = g_loss_style.item()
                     loss_dict['G/loss_percep'] = g_loss_percep.item()
-
-                    """
-                    # Original-to-target domain.
-                    x_fake = self.G(sketch)
-                    out_src = self.D(x_fake)
-                    g_loss_fake = - torch.mean(out_src)
-                    """
 
                 if (i + 1) % self.log_step == 0:
                     et = time.time() - start_time
