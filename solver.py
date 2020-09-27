@@ -352,6 +352,7 @@ class Solver(object):
                 with torch.no_grad():
                     image_report = list()
                     image_report.append(fixed_sketch)
+                    image_report.append(fixed_elastic_reference)
                     image_report.append(fixed_reference)
                     image_report.append(self.G(fixed_sketch))
                     x_concat = torch.cat(image_report, dim=3)
