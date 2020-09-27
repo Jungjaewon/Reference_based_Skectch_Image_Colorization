@@ -223,7 +223,7 @@ class SCFT_Moudle(nn.Module):
         b, ch, hw = v_sum.size()
         v_sum = v_sum.reshape((b, ch, 16, 16))
         #print('v_sum.size() : ', v_sum.size())  # v_sum.size() :  torch.Size([2, 992, 16, 16])
-        return v_sum
+        return v_sum, [q_result, k_result, v_result]
 
 class Generator(nn.Module):
     """Discriminator network with PatchGAN.
@@ -240,9 +240,9 @@ class Generator(nn.Module):
     def forward(self, reference, sketch):
         v_r, _ = self.encoder_reference(reference)
         v_s, feature_list = self.encoder_sketch(sketch)
-        v_c = self.scft_module(v_s, v_r)
+        v_c, q_k_v_list = self.scft_module(v_s, v_r)
         rv_c = self.res_model(v_c)
         concat = torch.cat([rv_c, v_c], dim=1)
         image = self.decoder(concat, feature_list)
-        return image
+        return image, q_k_v_list
 

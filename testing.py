@@ -1,5 +1,6 @@
 from torchvision.models import vgg19
 import torch
+import math
 import numpy as np
 from utils import get_outline_image
 from utils import elastic_transform
@@ -17,6 +18,12 @@ def get_activation(name):
         vgg_activation[name] = output.detach()
 
     return hook
+
+def scaled_dot_product(a, b):
+    channel = a.size(1) * a.size(2)
+    scale_factor = math.sqrt(channel)
+    out = torch.bmm(a.view(2, 1, channel), b.view(2, channel , 1)).reshape(-1)
+    return out / scale_factor
 
 if __name__ == '__main__':
     pass
@@ -91,11 +98,26 @@ if __name__ == '__main__':
     elastic_result.save('./elastic_result.jpg')
     """
 
-    tensor1 = torch.randn((2, 3, 256, 256))
-    tensor2 = torch.randn((2, 1, 256, 256))
+    #tensor1 = torch.randn((2, 3, 256, 256))
+    #tensor2 = torch.randn((2, 1, 256, 256))
 
-    print(torch.cat([tensor1, tensor2], dim=1).size())
+    #print(torch.cat([tensor1, tensor2], dim=1).size())
+    """
+    B = 1024
+    S = 128
+    x = torch.randn(B, S)
+    y = torch.randn(B, S)
+    out = torch.bmm(x.view(B, 1, S), y.view(B, S, 1)).reshape(-1)
 
+    print(out.size())
+    """
+
+    x = torch.randn(2, 992, 256)
+    y = torch.randn(2, 992, 256)
+
+    out = scaled_dot_product(x,y)
+    print(out.size())
+    print(out)
 
 
 

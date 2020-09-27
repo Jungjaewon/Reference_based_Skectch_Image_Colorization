@@ -6,6 +6,7 @@ import datetime
 import torch
 import torch.nn as nn
 import glob
+import math
 import os.path as osp
 
 from torchvision import models
@@ -54,6 +55,8 @@ class Solver(object):
 
         if self.triplet:
             self.triplet_loss = nn.TripletMarginLoss(margin=config['TRAINING_CONFIG']['LAMBDA_TR'])
+            #self.triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=self.scaled_dot_product(),
+            # margin=config['TRAINING_CONFIG']['LAMBDA_TR'])
             # triplet_loss(anchor, positive, negative)
 
         self.optim = config['TRAINING_CONFIG']['OPTIM']
@@ -182,6 +185,19 @@ class Solver(object):
         # by dividing by the number of element in each feature maps.
         return G.div(a * b * c * d)
 
+    def scaled_dot_product(self, a, b):
+        #https://github.com/pytorch/pytorch/issues/18027
+        channel = a.size(1) * a.size(2)
+        scale_factor = torch.sqrt(channel)
+        out = torch.bmm(a.view(self.batch_size, 1, channel), b.view(self.batch_size, channel , 1)).reshape(-1)
+        out = torch.div(out, scale_factor)
+        return out
+
+    def triple_loss_custom(self, anchor, positive, negative, margin=0.2):
+        distance = self.scaled_dot_product(anchor, positive) - self.scaled_dot_product(anchor, negative) + margin
+        loss = torch.mean(torch.max(distance, torch.zeros_like(distance)))
+        return loss
+
     def restore_model(self):
 
         ckpt_list = glob.glob(osp.join(self.model_dir, '*-G.ckpt'))
@@ -237,7 +253,7 @@ class Solver(object):
                 loss_dict = dict()
                 if (i + 1) % self.d_critic == 0:
 
-                    fake_images = self.G(elastic_reference, sketch)
+                    fake_images, _ = self.G(elastic_reference, sketch)
                     d_loss = None
 
                     if self.gan_loss == 'lsgan':
@@ -251,7 +267,6 @@ class Solver(object):
                         fake_score = self.D(torch.cat([fake_images.detach(), sketch], dim=1))
                         d_loss_real = -torch.mean(real_score)
                         d_loss_fake = torch.mean(fake_score)
-                        d_loss = self.lambda_d_real * d_loss_real + self.lambda_d_fake * d_loss_fake
                         alpha = torch.rand(reference.size(0), 1, 1, 1).to(self.gpu)
                         x_hat = (alpha * reference.data + (1 - alpha) * fake_images.data).requires_grad_(True)
                         out_src = self.D(x_hat)
@@ -270,7 +285,7 @@ class Solver(object):
                     loss_dict['D/loss_fake'] = d_loss_fake.item()
 
                 if (i + 1) % self.g_critic == 0:
-                    fake_images = self.G(elastic_reference, sketch)
+                    fake_images, q_k_v_list = self.G(elastic_reference, sketch)
                     fake_score = self.D(torch.cat([fake_images, sketch], dim=1))
                     if self.gan_loss == 'lsgan':
                         g_loss_fake = self.adversarial_loss(fake_score, torch.ones_like(fake_score))
@@ -300,10 +315,18 @@ class Solver(object):
                         g_loss_percep += self.l1_loss(fake_activation[layer], real_activation[layer])
                         g_loss_style += self.l1_loss(self.gram_matrix(fake_activation[layer]), self.gram_matrix(real_activation[layer]))
 
+                    if self.triplet:
+                        anchor = q_k_v_list[0].veiw(self.batch_size, -1)
+                        positive = q_k_v_list[1].veiw(self.batch_size, -1)
+                        negative = q_k_v_list[2].veiw(self.batch_size, -1)
+                        g_loss_triple = self.triplet_loss(anchor=anchor, positive=positive, negative=negative)
+
                     g_loss = self.lambda_g_fake * g_loss_fake + \
                     self.lambda_g_recon * g_loss_recon + \
                     self.lambda_g_percep * g_loss_percep + \
                     self.lambda_g_style * g_loss_style
+                    if self.triplet:
+                        g_loss += 1 * g_loss_triple
 
                     self.reset_grad()
                     g_loss.backward()
@@ -314,6 +337,8 @@ class Solver(object):
                     loss_dict['G/loss_recon'] = g_loss_recon.item()
                     loss_dict['G/loss_style'] = g_loss_style.item()
                     loss_dict['G/loss_percep'] = g_loss_percep.item()
+                    if self.triplet:
+                        loss_dict['G/loss_triple'] = g_loss_triple.item()
 
                 if (i + 1) % self.log_step == 0:
                     et = time.time() - start_time
