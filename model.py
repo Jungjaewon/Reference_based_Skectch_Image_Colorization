@@ -11,7 +11,7 @@ class Discriminator(nn.Module):
     def __init__(self, spec_norm=True, LR=0.2):
         super(Discriminator, self).__init__()
         self.main = list()
-        self.main.append(ConvBlock(3, 16, spec_norm, stride=2, LR=LR)) # 256 -> 128
+        self.main.append(ConvBlock(4, 16, spec_norm, stride=2, LR=LR)) # 256 -> 128
         self.main.append(ConvBlock(16, 32, spec_norm, stride=2, LR=LR)) # 128 -> 64
         self.main.append(ConvBlock(32, 64, spec_norm, stride=2, LR=LR)) # 64 -> 32
         self.main.append(ConvBlock(64, 128, spec_norm, stride=2, LR=LR)) # 32 -> 16

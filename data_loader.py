@@ -12,8 +12,9 @@ from utils import elastic_transform
 
 class DataSet(data.Dataset):
 
-    def __init__(self, config, img_transform):
-        self.img_transform = img_transform
+    def __init__(self, config, img_transform_gt, img_transform_sketch):
+        self.img_transform_gt = img_transform_gt
+        self.img_transform_sketch = img_transform_sketch
         self.img_dir = osp.join(config['TRAINING_CONFIG']['IMG_DIR'], config['TRAINING_CONFIG']['MODE'])
         self.img_size = (config['MODEL_CONFIG']['IMG_SIZE'], config['MODEL_CONFIG']['IMG_SIZE'], 3)
 
@@ -54,7 +55,7 @@ class DataSet(data.Dataset):
         else:
             augmented_reference = reference
 
-        return fid, self.img_transform(augmented_reference), self.img_transform(reference), self.img_transform(sketch)
+        return fid, self.img_transform_gt(augmented_reference), self.img_transform_gt(reference), self.img_transform_sketch(sketch)
 
     def __len__(self):
         """Return the number of images."""
@@ -64,14 +65,20 @@ class DataSet(data.Dataset):
 def get_loader(config):
 
     img_transform_gt = list()
+    img_transform_sketch = list()
     img_size = config['MODEL_CONFIG']['IMG_SIZE']
 
     img_transform_gt.append(T.Resize((img_size, img_size)))
     img_transform_gt.append(T.ToTensor())
     img_transform_gt.append(T.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
-    img_transform = T.Compose(img_transform_gt)
+    img_transform_gt = T.Compose(img_transform_gt)
 
-    dataset = DataSet(config, img_transform)
+    img_transform_sketch.append(T.Resize((img_size, img_size)))
+    img_transform_sketch.append(T.ToTensor())
+    img_transform_sketch.append(T.Normalize(mean=(0.5), std=(0.5)))
+    img_transform_sketch = T.Compose(img_transform_sketch)
+
+    dataset = DataSet(config, img_transform_gt, img_transform_sketch)
     data_loader = data.DataLoader(dataset=dataset,
                                   batch_size=config['TRAINING_CONFIG']['BATCH_SIZE'],
                                   shuffle=(config['TRAINING_CONFIG']['MODE'] == 'train'),

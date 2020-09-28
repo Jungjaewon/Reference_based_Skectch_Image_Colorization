@@ -1,7 +1,6 @@
 
 import os
 import time
-import operator
 import datetime
 import torch
 import torch.nn as nn
@@ -9,11 +8,8 @@ import glob
 import math
 import os.path as osp
 
-from torchvision import models
-from functools import reduce
 from model import Generator
 from model import Discriminator
-
 from torchvision.models import vgg19
 from torchvision.utils import save_image
 
@@ -49,7 +45,7 @@ class Solver(object):
         self.g_critic      = config['TRAINING_CONFIG']['G_CRITIC']
         self.mse_loss = nn.MSELoss()
 
-        self.triplet = config['TRAINING_CONFIG']['TRIPLE_LOSS'] == 'true'
+        self.triplet = config['TRAINING_CONFIG']['TRIPLE_LOSS'] == 'True'
         self.gan_loss = config['TRAINING_CONFIG']['GAN_LOSS']
         assert self.gan_loss in ['lsgan', 'wgan']
 
@@ -108,6 +104,7 @@ class Solver(object):
         self.vgg = vgg19(pretrained=True)
         for layer in self.target_layer:
             self.vgg.features[int(layer[-1])].register_forward_hook(get_activation(layer))
+        self.vgg.to(self.gpu)
 
         """
         self.vgg.features[3].register_forward_hook(get_activation('relu_3'))
@@ -187,13 +184,13 @@ class Solver(object):
 
     def scaled_dot_product(self, a, b):
         #https://github.com/pytorch/pytorch/issues/18027
-        channel = a.size(1) * a.size(2)
-        scale_factor = torch.sqrt(channel)
+        channel = a.size(1)
+        scale_factor = torch.sqrt(torch.cuda.FloatTensor([channel]))
         out = torch.bmm(a.view(self.batch_size, 1, channel), b.view(self.batch_size, channel , 1)).reshape(-1)
         out = torch.div(out, scale_factor)
         return out
 
-    def triple_loss_custom(self, anchor, positive, negative, margin=0.2):
+    def triple_loss_custom(self, anchor, positive, negative, margin=12):
         distance = self.scaled_dot_product(anchor, positive) - self.scaled_dot_product(anchor, negative) + margin
         loss = torch.mean(torch.max(distance, torch.zeros_like(distance)))
         return loss
@@ -316,10 +313,11 @@ class Solver(object):
                         g_loss_style += self.l1_loss(self.gram_matrix(fake_activation[layer]), self.gram_matrix(real_activation[layer]))
 
                     if self.triplet:
-                        anchor = q_k_v_list[0].veiw(self.batch_size, -1)
-                        positive = q_k_v_list[1].veiw(self.batch_size, -1)
-                        negative = q_k_v_list[2].veiw(self.batch_size, -1)
-                        g_loss_triple = self.triplet_loss(anchor=anchor, positive=positive, negative=negative)
+                        anchor = q_k_v_list[0].view(self.batch_size, -1)
+                        positive = q_k_v_list[1].contiguous().view(self.batch_size, -1)
+                        negative = q_k_v_list[2].contiguous().view(self.batch_size, -1)
+                        g_loss_triple = self.triple_loss_custom(anchor=anchor, positive=positive, negative=negative)
+                        #g_loss_triple = self.triplet_loss(anchor=anchor, positive=positive, negative=negative)
 
                     g_loss = self.lambda_g_fake * g_loss_fake + \
                     self.lambda_g_recon * g_loss_recon + \

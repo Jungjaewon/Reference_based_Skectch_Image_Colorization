@@ -1,11 +1,11 @@
 
 MODEL_CONFIG:
-  IMG_SIZE: 512
+  IMG_SIZE: 256
 
 TRAINING_CONFIG:
 
-  EPOCH: 800
-  BATCH_SIZE: 16
+  EPOCH: 100
+  BATCH_SIZE: 8
 
   # lr and lambda
   G_LR : 10e-4
@@ -20,10 +20,10 @@ TRAINING_CONFIG:
   LAMBDA_GP : 20000
 
   # Data augmentation
-  AUGMENT : 'elastic' # or 'tps
+  AUGMENT : 'tps' # or 'tps, elastic
 
   #Triplet loss
-  TRIPLE_LOSS : 'True'
+  TRIPLE_LOSS : 'True' # 'True' or 'False'
   GAN_LOSS : 'lsgan'
 
   # Optimizer
