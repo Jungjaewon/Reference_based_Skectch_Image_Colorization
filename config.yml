@@ -34,7 +34,7 @@ TRAINING_CONFIG:
   G_CRITIC : 1
 
   # Settings
-  NUM_WORKER : 4
+  NUM_WORKER : 0
   MODE : 'train'
   CPU_SEED : 123
   GPU_SEED : 456
