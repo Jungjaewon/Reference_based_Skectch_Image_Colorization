@@ -66,8 +66,8 @@ class Solver(object):
         #torch.manual_seed(config['TRAINING_CONFIG']['CPU_SEED'])
         #torch.cuda.manual_seed_all(config['TRAINING_CONFIG']['GPU_SEED'])
 
-        self.g_spec = config['TRAINING_CONFIG']['G_SPEC'] == 'true'
-        self.d_spec = config['TRAINING_CONFIG']['D_SPEC'] == 'true'
+        self.g_spec = config['TRAINING_CONFIG']['G_SPEC'] == 'True'
+        self.d_spec = config['TRAINING_CONFIG']['D_SPEC'] == 'True'
 
         self.gpu = config['TRAINING_CONFIG']['GPU']
         self.use_tensorboard = config['TRAINING_CONFIG']['USE_TENSORBOARD']

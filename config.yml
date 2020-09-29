@@ -47,11 +47,11 @@ TRAINING_CONFIG:
   MEAN : 0
   STD : 0.01
   #spectral norm
-  G_SPEC : 'false'
-  D_SPEC : 'true'
+  G_SPEC : 'False'
+  D_SPEC : 'True'
 
   # Directory
-  IMG_DIR : '/home/mlm11/workhistory/pix2pix_for_sket2chracter/data'
+  IMG_DIR : 'data'
   TRAIN_DIR : 'colorization_gan1'
   LOG_DIR : 'logs'
   SAMPLE_DIR : 'samples'
@@ -59,14 +59,14 @@ TRAINING_CONFIG:
   MODEL_DIR : 'models'
 
   # GPU
-  GPU: 2
+  GPU: 0
 
   # Step Size
 
   SAMPLE_STEP : 1 # epoch based
   LOG_STEP : 100 # iteration based
-  SAVE_STEP : 10 # epoch based
-  SAVE_START : 100
+  SAVE_STEP : 5 # epoch based
+  SAVE_START : 250
   LR_DECAY_STEP : 20
 
 TEST_CONFIG:
