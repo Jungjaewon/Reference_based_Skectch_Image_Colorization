@@ -51,7 +51,7 @@ TRAINING_CONFIG:
   D_SPEC : 'true'
 
   # Directory
-  IMG_DIR : '/mlm11/workhistory/pix2pix_for_sket2chracter/data'
+  IMG_DIR : '/home/mlm11/workhistory/pix2pix_for_sket2chracter/data'
   TRAIN_DIR : 'colorization_gan1'
   LOG_DIR : 'logs'
   SAMPLE_DIR : 'samples'
