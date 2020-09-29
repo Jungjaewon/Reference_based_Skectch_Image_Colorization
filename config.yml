@@ -4,7 +4,7 @@ MODEL_CONFIG:
 
 TRAINING_CONFIG:
 
-  EPOCH: 100
+  EPOCH: 300
   BATCH_SIZE: 8
 
   # lr and lambda
@@ -23,7 +23,7 @@ TRAINING_CONFIG:
   AUGMENT : 'tps' # or 'tps, elastic
 
   #Triplet loss
-  TRIPLE_LOSS : 'True' # 'True' or 'False'
+  TRIPLE_LOSS : 'False' # 'True' or 'False'
   GAN_LOSS : 'lsgan'
 
   # Optimizer
@@ -40,13 +40,10 @@ TRAINING_CONFIG:
   GPU_SEED : 456
   USE_TENSORBOARD : 'False' # 'True' or 'False'
 
-  # model type
-  MODEL_TYPE : 'res'
-
   # noise parameter
   DIST : 'uniform' # of 'gaussian'
-  A : -5
-  B : 5
+  A : -1
+  B : 1
   MEAN : 0
   STD : 0.01
   #spectral norm
@@ -54,22 +51,22 @@ TRAINING_CONFIG:
   D_SPEC : 'true'
 
   # Directory
-  IMG_DIR : 'data'
-  TRAIN_DIR : 'tutorial_gan'
+  IMG_DIR : '/mlm11/workhistory/pix2pix_for_sket2chracter/data'
+  TRAIN_DIR : 'colorization_gan1'
   LOG_DIR : 'logs'
   SAMPLE_DIR : 'samples'
   RESULT_DIR : 'results'
   MODEL_DIR : 'models'
 
   # GPU
-  GPU: 0
+  GPU: 2
 
   # Step Size
 
   SAMPLE_STEP : 1 # epoch based
   LOG_STEP : 100 # iteration based
   SAVE_STEP : 10 # epoch based
-  SAVE_START : 300
+  SAVE_START : 100
   LR_DECAY_STEP : 20
 
 TEST_CONFIG:

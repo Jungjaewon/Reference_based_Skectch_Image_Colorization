@@ -2,6 +2,7 @@ import numpy as np
 import thinplate as tps
 import cv2
 import random
+import math
 
 def tps_transform(img, dshape=None):
 
@@ -10,7 +11,7 @@ def tps_transform(img, dshape=None):
         point2 = round(random.uniform(0.3, 0.7), 2)
         range_1 = round(random.uniform(-0.25, 0.25), 2)
         range_2 = round(random.uniform(-0.25, 0.25), 2)
-        if point1 + range_1 == point2 + range_2:
+        if math.isclose(point1 + range_1, point2 + range_2):
             continue
         else:
             break

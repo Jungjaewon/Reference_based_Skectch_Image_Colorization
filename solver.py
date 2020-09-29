@@ -66,8 +66,6 @@ class Solver(object):
         #torch.manual_seed(config['TRAINING_CONFIG']['CPU_SEED'])
         #torch.cuda.manual_seed_all(config['TRAINING_CONFIG']['GPU_SEED'])
 
-        self.model_type = config['TRAINING_CONFIG']['MODEL_TYPE']
-
         self.g_spec = config['TRAINING_CONFIG']['G_SPEC'] == 'true'
         self.d_spec = config['TRAINING_CONFIG']['D_SPEC'] == 'true'
 
@@ -278,8 +276,12 @@ class Solver(object):
                     self.d_optimizer.step()
 
                     # Logging.
-                    loss_dict['D/loss_real'] = d_loss_real.item()
-                    loss_dict['D/loss_fake'] = d_loss_fake.item()
+                    loss_dict['D/loss_real'] = self.lambda_d_real * d_loss_real.item()
+                    loss_dict['D/loss_fake'] = self.lambda_d_fake * d_loss_fake.item()
+
+                    if self.gan_loss == 'wgan':
+                        loss_dict['D/loss_pg'] = self.lambda_d_gp * d_loss_gp.item()
+
 
                 if (i + 1) % self.g_critic == 0:
                     fake_images, q_k_v_list = self.G(elastic_reference, sketch)
@@ -331,10 +333,10 @@ class Solver(object):
                     self.g_optimizer.step()
 
                     # Logging.
-                    loss_dict['G/loss_fake'] = g_loss_fake.item()
-                    loss_dict['G/loss_recon'] = g_loss_recon.item()
-                    loss_dict['G/loss_style'] = g_loss_style.item()
-                    loss_dict['G/loss_percep'] = g_loss_percep.item()
+                    loss_dict['G/loss_fake'] = self.lambda_g_fake * g_loss_fake.item()
+                    loss_dict['G/loss_recon'] = self.lambda_g_recon * g_loss_recon.item()
+                    loss_dict['G/loss_style'] = self.lambda_g_style * g_loss_style.item()
+                    loss_dict['G/loss_percep'] = self.lambda_g_percep * g_loss_percep.item()
                     if self.triplet:
                         loss_dict['G/loss_triple'] = g_loss_triple.item()
 
@@ -349,10 +351,11 @@ class Solver(object):
             if (e + 1) % self.sample_step == 0:
                 with torch.no_grad():
                     image_report = list()
-                    image_report.append(fixed_sketch)
+                    image_report.append(fixed_sketch.expand_as(fixed_reference))
                     image_report.append(fixed_elastic_reference)
                     image_report.append(fixed_reference)
-                    image_report.append(self.G(fixed_sketch))
+                    fake_result, _ = self.G(fixed_elastic_reference, fixed_sketch)
+                    image_report.append(fake_result)
                     x_concat = torch.cat(image_report, dim=3)
                     sample_path = os.path.join(self.sample_dir, '{}-images.jpg'.format(e + 1))
                     save_image(self.denorm(x_concat.data.cpu()), sample_path, nrow=1, padding=0)
