@@ -111,13 +111,29 @@ if __name__ == '__main__':
 
     print(out.size())
     """
-
+    """
     x = torch.randn(2, 992, 256)
     y = torch.randn(2, 992, 256)
 
     out = scaled_dot_product(x,y)
     print(out.size())
     print(out)
+    
+    """
+
+    x = torch.randn(5, 3, 256, 256)
+
+    reuslt_x = list(torch.chunk(x, 5, dim=0))
+    for tx in reuslt_x:
+        print(id(tx))
+    first_x = reuslt_x[0]
+    del reuslt_x[0]
+    reuslt_x.append(first_x)
+    for tx in reuslt_x:
+        print(id(tx))
+    print(torch.cat(reuslt_x, dim=0).size())
+
+
 
 
 

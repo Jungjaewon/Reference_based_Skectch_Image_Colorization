@@ -1,2 +1,13 @@
-# Reference_based__Skectch_Image_Colorization
-This repository implements the paper "Reference based Sketch Image Colorization using Augmented-Self Reference and Dense Semantic Correspondence" which is published in CVPR2020.
+Reference_based_Skectch_Image_Colorization
+====
+This repository implements the paper ["Reference based Sketch Image Colorization using Augmented-Self Reference and Dense Semantic Correspondence"](https://arxiv.org/abs/2005.05207) published in CVPR2020.
+
+Results
+====
+
+
+Requirements
+====
+* python3.6+
+* pytorch 1.6.0
+* others.

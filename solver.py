@@ -5,7 +5,6 @@ import datetime
 import torch
 import torch.nn as nn
 import glob
-import math
 import os.path as osp
 
 from model import Generator
@@ -47,7 +46,7 @@ class Solver(object):
 
         self.triplet = config['TRAINING_CONFIG']['TRIPLE_LOSS'] == 'True'
         self.gan_loss = config['TRAINING_CONFIG']['GAN_LOSS']
-        assert self.gan_loss in ['lsgan', 'wgan']
+        assert self.gan_loss in ['lsgan', 'wgan', 'vanilla']
 
         if self.triplet:
             self.triplet_loss = nn.TripletMarginLoss(margin=config['TRAINING_CONFIG']['LAMBDA_TR'])
@@ -58,7 +57,10 @@ class Solver(object):
         self.optim = config['TRAINING_CONFIG']['OPTIM']
         self.beta1 = config['TRAINING_CONFIG']['BETA1']
         self.beta2 = config['TRAINING_CONFIG']['BETA2']
-        self.adversarial_loss = torch.nn.MSELoss()
+        if self.gan_loss == 'lsgan':
+            self.adversarial_loss = torch.nn.MSELoss()
+        elif self.gan_loss =='vanilla':
+            self.adversarial_loss =  torch.nn.BCELoss()
         self.l1_loss = torch.nn.L1Loss()
 
         self.cpu_seed = config['TRAINING_CONFIG']['CPU_SEED']
@@ -211,6 +213,17 @@ class Solver(object):
         self.D.to(self.gpu)
         return epoch
 
+    def image_reporting(self, fixed_sketch, fixed_reference, fixed_elastic_reference, epoch, postfix=''):
+        image_report = list()
+        image_report.append(fixed_sketch.expand_as(fixed_reference))
+        image_report.append(fixed_elastic_reference)
+        image_report.append(fixed_reference)
+        fake_result, _ = self.G(fixed_elastic_reference, fixed_sketch)
+        image_report.append(fake_result)
+        x_concat = torch.cat(image_report, dim=3)
+        sample_path = os.path.join(self.sample_dir, '{}-images{}.jpg'.format(epoch + 1, postfix))
+        save_image(self.denorm(x_concat.data.cpu()), sample_path, nrow=1, padding=0)
+
     def train(self):
 
         # Set data loader.
@@ -220,6 +233,12 @@ class Solver(object):
         # Fetch fixed inputs for debugging.
         data_iter = iter(data_loader)
         _, fixed_elastic_reference, fixed_reference, fixed_sketch = next(data_iter)
+
+        splited_fixed_sketch = list(torch.chunk(fixed_sketch, self.batch_size, dim=0))
+        first_fixed_sketch = splited_fixed_sketch[0]
+        del splited_fixed_sketch[0]
+        splited_fixed_sketch.append(first_fixed_sketch)
+        shifted_fixed_sketch = torch.cat(splited_fixed_sketch, dim=0)
 
         fixed_sketch = fixed_sketch.to(self.gpu)
         fixed_reference = fixed_reference.to(self.gpu)
@@ -251,7 +270,7 @@ class Solver(object):
                     fake_images, _ = self.G(elastic_reference, sketch)
                     d_loss = None
 
-                    if self.gan_loss == 'lsgan':
+                    if self.gan_loss in ['lsgan', 'vanilla']:
                         real_score = self.D(torch.cat([reference, sketch], dim=1))
                         fake_score = self.D(torch.cat([fake_images.detach(), sketch], dim=1))
                         d_loss_real = self.adversarial_loss(real_score, torch.ones_like(real_score))
@@ -267,8 +286,6 @@ class Solver(object):
                         out_src = self.D(x_hat)
                         d_loss_gp = self.gradient_penalty(out_src, x_hat)
                         d_loss = self.lambda_d_real * d_loss_real + self.lambda_d_fake * d_loss_fake + self.lambda_d_gp * d_loss_gp
-                    else:
-                        pass
 
                     # Backward and optimize.
                     self.reset_grad()
@@ -282,11 +299,10 @@ class Solver(object):
                     if self.gan_loss == 'wgan':
                         loss_dict['D/loss_pg'] = self.lambda_d_gp * d_loss_gp.item()
 
-
                 if (i + 1) % self.g_critic == 0:
                     fake_images, q_k_v_list = self.G(elastic_reference, sketch)
                     fake_score = self.D(torch.cat([fake_images, sketch], dim=1))
-                    if self.gan_loss == 'lsgan':
+                    if self.gan_loss in ['lsgan', 'vanilla']:
                         g_loss_fake = self.adversarial_loss(fake_score, torch.ones_like(fake_score))
                     elif self.gan_loss == 'wgan':
                         g_loss_fake = - torch.mean(fake_score)
@@ -350,16 +366,9 @@ class Solver(object):
 
             if (e + 1) % self.sample_step == 0:
                 with torch.no_grad():
-                    image_report = list()
-                    image_report.append(fixed_sketch.expand_as(fixed_reference))
-                    image_report.append(fixed_elastic_reference)
-                    image_report.append(fixed_reference)
-                    fake_result, _ = self.G(fixed_elastic_reference, fixed_sketch)
-                    image_report.append(fake_result)
-                    x_concat = torch.cat(image_report, dim=3)
-                    sample_path = os.path.join(self.sample_dir, '{}-images.jpg'.format(e + 1))
-                    save_image(self.denorm(x_concat.data.cpu()), sample_path, nrow=1, padding=0)
-                    print('Saved real and fake images into {}...'.format(sample_path))
+                    self.image_reporting(fixed_sketch, fixed_reference, fixed_elastic_reference, e + 1, postfix='')
+                    self.image_reporting(shifted_fixed_sketch, fixed_reference, fixed_elastic_reference, e + 1, postfix='_shifted')
+                    print('Saved real and fake images into {}...'.format(self.sample_dir))
             # Save model checkpoints.
             if (e + 1) % self.save_step == 0 and (e + 1) >= self.save_start:
                 G_path = os.path.join(self.model_dir, '{}-G.ckpt'.format(e + 1))
