@@ -104,7 +104,7 @@ class Solver(object):
         self.D = Discriminator(spec_norm=self.d_spec, LR=0.2).to(self.gpu)
         self.vgg = vgg19(pretrained=True)
         for layer in self.target_layer:
-            self.vgg.features[int(layer[-1])].register_forward_hook(get_activation(layer))
+            self.vgg.features[int(layer.split('_')[-1])].register_forward_hook(get_activation(layer))
         self.vgg.to(self.gpu)
 
         """
