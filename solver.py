@@ -50,6 +50,7 @@ class Solver(object):
 
         if self.triplet:
             self.triplet_loss = nn.TripletMarginLoss(margin=config['TRAINING_CONFIG']['LAMBDA_TR'])
+            self.triple_margin = config['TRAINING_CONFIG']['LAMBDA_TR']
             #self.triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=self.scaled_dot_product(),
             # margin=config['TRAINING_CONFIG']['LAMBDA_TR'])
             # triplet_loss(anchor, positive, negative)
@@ -60,7 +61,7 @@ class Solver(object):
         if self.gan_loss == 'lsgan':
             self.adversarial_loss = torch.nn.MSELoss()
         elif self.gan_loss =='vanilla':
-            self.adversarial_loss =  torch.nn.BCELoss()
+            self.adversarial_loss = torch.nn.BCELoss()
         self.l1_loss = torch.nn.L1Loss()
 
         self.cpu_seed = config['TRAINING_CONFIG']['CPU_SEED']
@@ -187,11 +188,13 @@ class Solver(object):
         channel = a.size(1)
         scale_factor = torch.sqrt(torch.cuda.FloatTensor([channel]))
         out = torch.bmm(a.view(self.batch_size, 1, channel), b.view(self.batch_size, channel , 1)).reshape(-1)
-        out = torch.div(out, scale_factor)
+        #out = torch.div(out, scale_factor)
         return out
 
     def triple_loss_custom(self, anchor, positive, negative, margin=12):
         distance = self.scaled_dot_product(anchor, positive) - self.scaled_dot_product(anchor, negative) + margin
+        #print('distance : ',distance)
+        #print('torch.max(distance, torch.zeros_like(distance)) : ', torch.max(distance, torch.zeros_like(distance)))
         loss = torch.mean(torch.max(distance, torch.zeros_like(distance)))
         return loss
 
@@ -221,7 +224,7 @@ class Solver(object):
         fake_result, _ = self.G(fixed_elastic_reference, fixed_sketch)
         image_report.append(fake_result)
         x_concat = torch.cat(image_report, dim=3)
-        sample_path = os.path.join(self.sample_dir, '{}-images{}.jpg'.format(epoch + 1, postfix))
+        sample_path = os.path.join(self.sample_dir, '{}-images{}.jpg'.format(epoch, postfix))
         save_image(self.denorm(x_concat.data.cpu()), sample_path, nrow=1, padding=0)
 
     def train(self):
@@ -243,6 +246,7 @@ class Solver(object):
         fixed_sketch = fixed_sketch.to(self.gpu)
         fixed_reference = fixed_reference.to(self.gpu)
         fixed_elastic_reference = fixed_elastic_reference.to(self.gpu)
+        shifted_fixed_sketch = shifted_fixed_sketch.to(self.gpu)
 
         # Learning rate cache for decaying.
         g_lr = self.g_lr
@@ -334,8 +338,8 @@ class Solver(object):
                         anchor = q_k_v_list[0].view(self.batch_size, -1)
                         positive = q_k_v_list[1].contiguous().view(self.batch_size, -1)
                         negative = q_k_v_list[2].contiguous().view(self.batch_size, -1)
-                        g_loss_triple = self.triple_loss_custom(anchor=anchor, positive=positive, negative=negative)
-                        #g_loss_triple = self.triplet_loss(anchor=anchor, positive=positive, negative=negative)
+                        #g_loss_triple = self.triple_loss_custom(anchor=anchor, positive=positive, negative=negative, margin=self.triple_margin)
+                        g_loss_triple = self.triplet_loss(anchor=anchor, positive=positive, negative=negative)
 
                     g_loss = self.lambda_g_fake * g_loss_fake + \
                     self.lambda_g_recon * g_loss_recon + \

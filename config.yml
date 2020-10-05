@@ -4,7 +4,7 @@ MODEL_CONFIG:
 
 TRAINING_CONFIG:
 
-  EPOCH: 300
+  EPOCH: 100
   BATCH_SIZE: 8
 
   # lr and lambda
@@ -52,7 +52,7 @@ TRAINING_CONFIG:
 
   # Directory
   IMG_DIR : 'data'
-  TRAIN_DIR : 'colorization_gan1'
+  TRAIN_DIR : 'colorization_gan2'
   LOG_DIR : 'logs'
   SAMPLE_DIR : 'samples'
   RESULT_DIR : 'results'
@@ -65,8 +65,8 @@ TRAINING_CONFIG:
 
   SAMPLE_STEP : 1 # epoch based
   LOG_STEP : 100 # iteration based
-  SAVE_STEP : 5 # epoch based
-  SAVE_START : 250
+  SAVE_STEP : 10 # epoch based
+  SAVE_START : 40
   LR_DECAY_STEP : 20
 
 TEST_CONFIG:
