@@ -76,7 +76,8 @@ class Solver(object):
         self.use_tensorboard = config['TRAINING_CONFIG']['USE_TENSORBOARD']
 
         # vgg activation
-        self.target_layer = ['relu_3', 'relu_8', 'relu_13', 'relu_17']
+        #self.target_layer = ['relu_3', 'relu_8', 'relu_13', 'relu_17']
+        self.target_layer = ['relu_3', 'relu_8']
 
         # Directory
         self.train_dir  = config['TRAINING_CONFIG']['TRAIN_DIR']
