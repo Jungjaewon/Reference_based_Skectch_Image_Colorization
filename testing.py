@@ -121,6 +121,7 @@ if __name__ == '__main__':
     
     """
 
+    """
     x = torch.randn(5, 3, 256, 256)
 
     reuslt_x = list(torch.chunk(x, 5, dim=0))
@@ -132,6 +133,12 @@ if __name__ == '__main__':
     for tx in reuslt_x:
         print(id(tx))
     print(torch.cat(reuslt_x, dim=0).size())
+    """
+
+    model = vgg19()
+    print(model.features)
+
+
 
 
 

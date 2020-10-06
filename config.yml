@@ -52,21 +52,21 @@ TRAINING_CONFIG:
 
   # Directory
   IMG_DIR : 'data'
-  TRAIN_DIR : 'colorization_gan2'
+  TRAIN_DIR : 'colorization_gan3'
   LOG_DIR : 'logs'
   SAMPLE_DIR : 'samples'
   RESULT_DIR : 'results'
   MODEL_DIR : 'models'
 
   # GPU
-  GPU: 0
+  GPU: 1
 
   # Step Size
 
   SAMPLE_STEP : 1 # epoch based
   LOG_STEP : 100 # iteration based
   SAVE_STEP : 10 # epoch based
-  SAVE_START : 40
+  SAVE_START : 10
   LR_DECAY_STEP : 20
 
 TEST_CONFIG:
