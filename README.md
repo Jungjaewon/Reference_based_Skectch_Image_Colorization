@@ -19,6 +19,15 @@ Not implmented yet
 ```
 
 ## Architecture
-![architecture]()
+![architecture](img/overview.JPG)
 ## Results
-![compare]()
+![shifted_result](img/100-images_shifted.jpg)
+![normalresult1](img/100-images.jpg)
+![normalresult2](img/300-images.jpg)
+
+## Comments
+ In this implementation, the triplet loss function is meaningless. It always show zeros for scaled dot product and l2 norm distance, if I am wrong, please make issue. Without the triplet loss, we can obtain good results. Even if a model is trained only 2 epochs, the model shows meaningful results.
+## Reference
+1. tps_transform : https://github.com/cheind/py-thin-plate-spline
+2. spectral normalization : https://github.com/christiancosgrove/pytorch-spectral-normalization-gan/blob/master/spectral_normalization.py
+3. unet : https://github.com/milesial/Pytorch-UNet

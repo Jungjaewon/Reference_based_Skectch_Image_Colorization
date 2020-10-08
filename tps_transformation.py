@@ -4,6 +4,8 @@ import cv2
 import random
 import math
 
+# Reference : https://github.com/cheind/py-thin-plate-spline
+
 def tps_transform(img, dshape=None):
 
     while True:
