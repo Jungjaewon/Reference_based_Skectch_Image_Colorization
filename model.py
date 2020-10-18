@@ -41,7 +41,7 @@ class ResBlockNet(nn.Module):
         self.main = nn.Sequential(*self.main)
 
     def forward(self, x):
-        return self.main(x)
+        return self.main(x) + x
 
 class Encoder(nn.Module):
     """Discriminator network with PatchGAN.
