@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 import math
 from block import ConvBlock
+from block import ResBlock
 
 
 class Discriminator(nn.Module):
@@ -20,7 +21,7 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         return self.main(x)
-
+"""
 class ResBlockNet(nn.Module):
 
     def __init__(self, in_channels, out_channels):
@@ -42,6 +43,21 @@ class ResBlockNet(nn.Module):
 
     def forward(self, x):
         return self.main(x) + x
+"""
+class ResBlockNet(nn.Module):
+
+    def __init__(self, in_channels, out_channels):
+        super(ResBlockNet, self).__init__()
+        self.main = list()
+        self.main.append(ResBlock(in_channels, out_channels))
+        self.main.append(ResBlock(out_channels, out_channels))
+        self.main.append(ResBlock(out_channels, out_channels))
+        self.main.append(ResBlock(out_channels, out_channels))
+        self.main = nn.Sequential(*self.main)
+
+    def forward(self, x):
+        return self.main(x) + x
+
 
 class Encoder(nn.Module):
     """Discriminator network with PatchGAN.

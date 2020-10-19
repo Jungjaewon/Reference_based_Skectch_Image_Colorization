@@ -4,6 +4,20 @@ import torch.nn.functional as F
 from spectral_normalization import SpectralNorm
 
 
+class ResBlock(nn.Module):
+    """Residual Block with instance normalization."""
+    def __init__(self,  in_channels, out_channels):
+        super(ResBlock, self).__init__()
+        self.main = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels, affine=True, track_running_stats=True),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels, affine=True, track_running_stats=True))
+
+    def forward(self, x):
+        return self.main(x) + x
+
 class ConvBlock(nn.Module):
     def __init__(self, dim_in, dim_out, spec_norm=False, LR=0.01, stride=1, up=False):
         super(ConvBlock, self).__init__()
@@ -46,6 +60,7 @@ class ConvBlock(nn.Module):
         else:
             return self.main(x1)
 
+"""
 class ConvUpBlock(nn.Module):
     def __init__(self, dim_in, dim_out, spec_norm=False, LR=0.01, up=False):
         super(ConvUpBlock, self).__init__()
@@ -85,3 +100,4 @@ class ConvUpBlock(nn.Module):
             return self.main(x)
         else:
             return self.main(x1)
+"""
